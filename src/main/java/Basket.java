@@ -75,6 +75,7 @@ public class Basket implements Serializable {
         writer.close();
     }
 
+
     public static Basket loadFromJSON(File textFile) throws FileNotFoundException {
         Gson gson = new Gson();
         FileReader reader = new FileReader(textFile);

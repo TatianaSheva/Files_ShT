@@ -1,8 +1,25 @@
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
 import java.util.Scanner;
 
 public class Main {
+
+    private static boolean basketLoadEnable = false;
+    private static String basketLoadFileName = "";
+    private static FileFormat basketLoadFormat = FileFormat.JSON;
+
+    private static boolean basketSaveEnable = false;
+    private static String basketSaveFileName = "";
+    private static FileFormat basketSaveFormat = FileFormat.JSON;
+
+    private static boolean logSaveEnable = false;
+    private static String logFileName = "";
 
     public static void main(String[] args) throws Exception {
 
@@ -15,24 +32,28 @@ public class Main {
         int productCount = 0;
 
 
-        File basketFile = new File("basket.bin");
-        File jsonFile = new File("basket.json");
-        File logFile = new File("log.csv");
         ClientLog clientLog = new ClientLog();
 
-        Scanner scan = new Scanner(System.in);
-        if (jsonFile.exists()) {
-            System.out.println("Загрузить корзину ENTER?");
-            if (scan.nextLine().equals("")) {
-                basket = Basket.loadFromJSON(jsonFile);
-                basket.printCart();
-                System.out.println(" ");
-                System.out.println("_______________________________________ ");
+        //Загружаем настройки
+        loadSettings();
+        System.out.println(" ");
 
-            } else {
-                basket = new Basket(listOfProducts, prices);
+        File basketFileForLoad = new File(basketLoadFileName);
+        File basketFileForSave = new File(basketSaveFileName);
+        File logFile = new File(logFileName);
+
+        Scanner scan = new Scanner(System.in);
+        if (basketFileForLoad.exists() && basketLoadEnable) {
+            //Если формат загружаемого файла JSON, то выгружаем корзину из него
+            if (basketLoadFormat == FileFormat.JSON) {
+                basket = Basket.loadFromJSON(basketFileForLoad);
+            }
+            //Если формат загружаемого файла TXT, то выгружаем корзину из него
+            if (basketLoadFormat == FileFormat.TXT) {
+                basket = Basket.loadFromBinFile(basketFileForLoad);
             }
         } else {
+            //Иначе создаем новую корзину по конструктору
             basket = new Basket(listOfProducts, prices);
         }
 
@@ -59,7 +80,7 @@ public class Main {
 
             // Исключение для ввода слов NumberFormatException
             try {
-                String a = split[0];//до пробела, чтобы получить номер продукта
+                String a = split[0];//До пробела, чтобы получить номер продукта
                 productNumber = Integer.parseInt(a) - 1;
                 // throw new NumberFormatException("Ошибка ввода: Вы ввели не число. Для корректной работы программы введите число!");
             } catch (NumberFormatException e) {
@@ -72,7 +93,7 @@ public class Main {
             }
 
 
-            String b = split[1]; //после пробела, чтобы получить количество
+            String b = split[1]; //После пробела, чтобы получить количество
             try {
 
                 productCount = Integer.parseInt(b);
@@ -86,18 +107,98 @@ public class Main {
                 continue;
             }
 
-            //Добавляем номер продукта и количество в корзину при каждом вводе
+            //Добавляем номер продукта и количество в соответствующие файлы
             basket.addToCart(productNumber, productCount);
-            //Сохраняем результаты в файл JSON
-            basket.saveToJSON(jsonFile);
-            //В файл лог записываем номер и количество введенных продуктов
+            if (basketSaveEnable) {
+                if (basketSaveFormat == FileFormat.JSON) {
+                    basket.saveToJSON(basketFileForSave);
+                }
+                if (basketSaveFormat == FileFormat.TXT) {
+                    basket.saveBin(basketFileForSave);
+                }
+            }
+
+            //Записываем в файл log
             clientLog.log(productNumber, productCount);
 
-            //В конце работы программы сохраняйте журнал действий в файл log.csv.
-            clientLog.exportAsCSV(logFile);
 
+            if (logSaveEnable) {
+                clientLog.exportAsCSV(logFile);
+            }
             basket.printCart();
 
+        }
+    }
+
+    static void loadSettings() throws Exception {
+        // Строится структура документаа
+        DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+        // Создается дерево DOM документа из файла
+        Document document = documentBuilder.parse("shop.xml");
+        Node root = document.getDocumentElement();
+
+        String sectionName;
+        String parameterName;
+        String parameterValue;
+        // Просматриваем все подэлементы
+        NodeList config = root.getChildNodes();
+        for (int i = 0; i < config.getLength(); i++) {
+            Node section = config.item(i);
+            // Если нода не текст, то заходим внутрь
+            if (section.getNodeType() != Node.TEXT_NODE) {
+                sectionName = section.getNodeName();
+                NodeList options = section.getChildNodes();
+                for (int k = 0; k < options.getLength(); k++) {
+                    Node parameter = options.item(k);
+                    if (parameter.getNodeType() != Node.TEXT_NODE) {
+                        parameterName = parameter.getNodeName();
+                        parameterValue = parameter.getFirstChild().getTextContent();
+                        setOption(sectionName, parameterName, parameterValue);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void setOption(String sectionName, String parameterName, String parameterValue) {
+        if (sectionName.equals("load")) {
+            if (parameterName.equals("enabled")) {
+                basketLoadEnable = parameterValue.equals("true");
+            }
+            if (parameterName.equals("fileName")) {
+                basketLoadFileName = parameterValue;
+            }
+            if (parameterName.equals("format")) {
+                if (parameterValue.equals("json")) {
+                    basketLoadFormat = FileFormat.JSON;
+                } else {
+                    basketLoadFormat = FileFormat.TXT;
+                }
+            }
+        }
+        if (sectionName.equals("save")) {
+            if (parameterName.equals("enabled")) {
+                basketSaveEnable = parameterValue.equals("true");
+            }
+            if (parameterName.equals("fileName")) {
+                basketSaveFileName = parameterValue;
+            }
+            if (parameterName.equals("format")) {
+                if (parameterValue.equals("json")) {
+                    basketSaveFormat = FileFormat.JSON;
+                } else {
+                    basketSaveFormat = FileFormat.TXT;
+                }
+            }
+
+        }
+        if (sectionName.equals("log")) {
+            if (parameterName.equals("enabled")) {
+                logSaveEnable = parameterValue.equals("true");
+            }
+            if (parameterName.equals("fileName")) {
+                logFileName = parameterValue;
+            }
         }
     }
 }
