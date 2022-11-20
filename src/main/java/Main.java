@@ -16,11 +16,15 @@ public class Main {
 
 
         File basketFile = new File("basket.bin");
+        File jsonFile = new File("basket.json");
+        File logFile = new File("log.csv");
+        ClientLog clientLog = new ClientLog();
+
         Scanner scan = new Scanner(System.in);
-        if (basketFile.exists()) {
+        if (jsonFile.exists()) {
             System.out.println("Загрузить корзину ENTER?");
             if (scan.nextLine().equals("")) {
-                basket = Basket.loadFromBinFile(basketFile);
+                basket = Basket.loadFromJSON(jsonFile);
                 basket.printCart();
                 System.out.println(" ");
                 System.out.println("_______________________________________ ");
@@ -82,8 +86,16 @@ public class Main {
                 continue;
             }
 
+            //Добавляем номер продукта и количество в корзину при каждом вводе
             basket.addToCart(productNumber, productCount);
-            basket.saveBin(basketFile);
+            //Сохраняем результаты в файл JSON
+            basket.saveToJSON(jsonFile);
+            //В файл лог записываем номер и количество введенных продуктов
+            clientLog.log(productNumber, productCount);
+
+            //В конце работы программы сохраняйте журнал действий в файл log.csv.
+            clientLog.exportAsCSV(logFile);
+
             basket.printCart();
 
         }
